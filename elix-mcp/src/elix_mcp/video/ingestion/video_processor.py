@@ -117,4 +117,18 @@ class VideoProcessor:
             string_embed=embeddings.using(model=settings.CAPTION_SIMILARITY_EMBD_MODEL),
             if_exists="replace_force"
         )
-        
+    
+    def add_video(self, video_path: str) -> bool: 
+        """
+        Add a video to the pixel table. 
+        Args: 
+         video_path(str): The path to the video file. 
+        """
+        if not self.video_table:
+            raise ValueError("Video table not initialized. Please call setup_table() first.")
+        logger.info(f"Adding video {video_path} to table {self.video_table_name}")
+
+        new_video_path = re_encode_video(video_path=video_path)
+        if new_video_path:
+            self.video_table.insert([{"video": video_path}])
+        return True
