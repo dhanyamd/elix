@@ -24,7 +24,7 @@ class Memory:
         {
                 "message_id": pxt.String,
                 "role": pxt.String,
-                "content": pxt.String,
+                "content": pxt.String, 
                 "timestamp": pxt.Timestamp,
             },
             if_exists="ignore",
