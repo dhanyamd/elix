@@ -27,7 +27,7 @@ class Memory:
                 "content": pxt.String, 
                 "timestamp": pxt.Timestamp,
             },
-            if_exists="ignore",
+            if_exists="ignore", 
         )
     def reset_memory(self):
         logger.info(f"Resetting memory: {self.directory}")
