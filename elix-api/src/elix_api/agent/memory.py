@@ -30,7 +30,7 @@ class Memory:
             if_exists="ignore", 
         )
     def reset_memory(self):
-        logger.info(f"Resetting memory: {self.directory}")
+        logger.info(f"Resetting memory: {self.directory}") 
         pxt.drop_dir(self.directory, if_not_exists="ignore", force=True)
 
     def insert(self, memory_record: MemoryRecord):
