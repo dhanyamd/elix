@@ -10,7 +10,7 @@ class MemoryRecord(BaseModel):
     role: str
     content: str
     timestamp: datetime
-
+ 
 class Memory: 
     def __init__(self, name: str): 
         self.directory = name
