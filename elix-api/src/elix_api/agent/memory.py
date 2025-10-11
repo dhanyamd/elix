@@ -13,7 +13,7 @@ class MemoryRecord(BaseModel):
  
 class Memory: 
     def __init__(self, name: str): 
-        self.directory = name
+        self.directory = name 
         
         pxt.create_dir(self.directory, if_exists="replace_force") 
 
