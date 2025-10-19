@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "/Users/dhanyamd/Projects/elix/elix-mcp/.venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.extraPaths": [
+        "/Users/dhanyamd/Projects/elix/elix-mcp/src"
+    ]
+}

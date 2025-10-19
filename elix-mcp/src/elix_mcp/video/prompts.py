@@ -39,7 +39,7 @@ The tools available are:
 # Current information:
 - Is image provided: {is_image_provided}
 """
-
+      
 GENERAL_SYSTEM_PROMPT = """
 Your name is Elix, a friendly assistant in charge
 of a video processing application. 
@@ -98,4 +98,4 @@ def general_system_prompt() -> str:
         logger.warning("Couldn't retrieve prompt from Opik, check credentials! Using hardcoded prompt.")
         logger.warning(f"Using hardcoded prompt: {GENERAL_SYSTEM_PROMPT}")
         prompt = GENERAL_SYSTEM_PROMPT
-    return prompt
+    return prompt 

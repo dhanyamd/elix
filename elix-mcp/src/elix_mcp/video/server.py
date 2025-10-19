@@ -1,9 +1,9 @@
 import click 
 from fastmcp import FastMCP 
 
-from elix_mcp.prompts import general_system_prompt, routing_system_prompt, tool_use_system_prompt
-from elix_mcp.resources import list_tables
-from elix_mcp.tools import (
+from elix_mcp.video.prompts import general_system_prompt, routing_system_prompt, tool_use_system_prompt
+from elix_mcp.video.resources import list_tables
+from elix_mcp.video.tools import (
     ask_question_about_video,
     get_video_clip_from_image,
     get_video_clip_from_user_query,
@@ -47,7 +47,7 @@ def add_mcp_resources(mcp: FastMCP):
         description="List all video indexes currently available.",
         tags={"resource", "all"},
     )
-
+    
 def add_mcp_prompts(mcp: FastMCP):
     mcp.add_prompt(
         fn=routing_system_prompt,
@@ -69,7 +69,7 @@ def add_mcp_prompts(mcp: FastMCP):
         description="Latest version of the general prompt from Opik.",
         tags={"prompt", "general"},
     )
-
+ 
 mcp = FastMCP("VideoProcessor")
 
 add_mcp_prompts(mcp)
