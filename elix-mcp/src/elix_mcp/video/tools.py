@@ -1,7 +1,7 @@
 from typing import Dict
 from uuid import uuid4
 
-from loguru import logger
+from loguru import logger      
 
 from elix_mcp.config import get_settings
 from elix_mcp.video.ingestion.tools import extract_video_clip
@@ -84,9 +84,12 @@ def get_video_clip_from_image(video_path: str, user_image: str) -> str:
         output_path=f"./shared_media/{str(uuid4())}.mp4",
     )
 
-    return video_clip.filename
+    return video_clip.filename           
 
-
+def test():
+    """"""
+    return 
+    
 def ask_question_about_video(video_path: str, user_query: str) -> str:
     """Get relevant captions from the video based on the user's question.
 
