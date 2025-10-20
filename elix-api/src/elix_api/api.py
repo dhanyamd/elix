@@ -90,7 +90,7 @@ async def process_video(request: ProcessVideoRequest, bg_tasks: BackgroundTasks,
         bg_task_states[task_id] = TaskStatus.IN_PROGRESS 
 
         if not Path(video_path).exists():
-            bg_tasks_states[task_id] = TaskStatus.FAILED 
+            bg_task_states[task_id] = TaskStatus.FAILED 
             raise HTTPException(status=404, detail="Video file not found") 
         try: 
             mcp_client = Client(settings.MCP_SERVER) 
@@ -104,7 +104,7 @@ async def process_video(request: ProcessVideoRequest, bg_tasks: BackgroundTasks,
     bg_tasks.add_task(background_process_video, request.video_path, task_id) 
     return ProcessVideoResponse(message="Task enqueued for processing", task_id=task_id)
 
-@app.post("/chat", response_model=AssitantMessageResponse)
+@app.post("/chat", response_model=AssistantMessageResponse)
 async def chat(request: UserMessageRequest, fastapi_request: Request):
      """
     Chat with the AI assistant
@@ -115,13 +115,13 @@ async def chat(request: UserMessageRequest, fastapi_request: Request):
     Returns:
         ChatResponse containing the assistant's response
     """
-    agent = fastapi_request.app.state.agent
-    await agent.setup()
+     agent = fastapi_request.app.state.agent
+     await agent.setup()
 
-    try:
+     try:
         response = await agent.chat(request.message, request.video_path, request.image_base64)
         return response
-    except Exception as e:
+     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/reset-memory")

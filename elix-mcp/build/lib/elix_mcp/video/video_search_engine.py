@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-import elix_mcp.video.ingestion.registry import registry
+from elix_mcp.video.ingestion.registry import registry
 from elix_mcp.config import get_settings
 from elix_mcp.video.ingestion.models import CachedTable
 from elix_mcp.video.ingestion.tools import decode_image 
@@ -19,10 +19,10 @@ class VideoSearchEngine:
         Raises:
             ValueError: If the video index is not found in registry.
         """
-        self.video_index: CachedTable = registry.get_table(video_name)
-        if not self.video_index:
+         self.video_index: CachedTable = registry.get_table(video_name)
+         if not self.video_index:
             raise ValueError(f"Video index {video_name} not found in registry.")
-        self.video_name = video_name
+         self.video_name = video_name
     
     def search_by_speech(self, query:str, top_k: int)-> List[Dict[str, Any]]:
         """Search video clips by speech similarity.
