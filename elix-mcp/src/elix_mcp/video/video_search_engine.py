@@ -1,17 +1,18 @@
 from typing import Any, Dict, List
 
-import elix_mcp.video.ingestion.registry import registry
+import elix_mcp.video.ingestion.registry as registry
 from elix_mcp.config import get_settings
 from elix_mcp.video.ingestion.models import CachedTable
-from elix_mcp.video.ingestion.tools import decode_image 
+from elix_mcp.video.ingestion.tools import decode_image
 
-settings = get_settings() 
+settings = get_settings()
+
 
 class VideoSearchEngine:
-    """A class that provides video search capabilities using different modalities""" 
+    """A class that provides video search capabilities using different modalities."""
 
-    def __init__(self, video_name: str): 
-         """Initialize the video search engine.
+    def __init__(self, video_name: str):
+        """Initialize the video search engine.
 
         Args:
             video_name (str): The name of the video index to search in.
@@ -23,8 +24,8 @@ class VideoSearchEngine:
         if not self.video_index:
             raise ValueError(f"Video index {video_name} not found in registry.")
         self.video_name = video_name
-    
-    def search_by_speech(self, query:str, top_k: int)-> List[Dict[str, Any]]:
+
+    def search_by_speech(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """Search video clips by speech similarity.
 
         Args:
@@ -37,21 +38,23 @@ class VideoSearchEngine:
                 - end_time (float): End time in seconds
                 - similarity (float): Similarity score
         """
-        sims = self.video_index.audio_chunks_view.chunk_text.similarity(query) 
+        sims = self.video_index.audio_chunks_view.chunk_text.similarity(query)
         results = self.video_index.audio_chunks_view.select(
-            self.video_index.audio_chunks.pos,
+            self.video_index.audio_chunks_view.pos,
             self.video_index.audio_chunks_view.start_time_sec,
             self.video_index.audio_chunks_view.end_time_sec,
-            similarity=sims
-        ).order_by(sims, asc=False) 
+            similarity=sims,
+        ).order_by(sims, asc=False)
+
         return [
             {
                 "start_time": float(entry["start_time_sec"]),
                 "end_time": float(entry["end_time_sec"]),
-                "similarity": float(entry["similarity"])
+                "similarity": float(entry["similarity"]),
             }
             for entry in results.limit(top_k).collect()
         ]
+
     def search_by_image(self, image_base64: str, top_k: int) -> List[Dict[str, Any]]:
         """Search video clips by image similarity.
 
@@ -81,6 +84,7 @@ class VideoSearchEngine:
             }
             for entry in results.limit(top_k).collect()
         ]
+
     def search_by_caption(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """Search video clips by caption similarity.
 
@@ -109,6 +113,7 @@ class VideoSearchEngine:
             }
             for entry in results.limit(top_k).collect()
         ]
+
     def get_speech_info(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """Get speech text information based on query similarity.
 
@@ -134,6 +139,7 @@ class VideoSearchEngine:
             }
             for entry in results.limit(top_k).collect()
         ]
+
     def get_caption_info(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """Get caption information based on query similarity.
 

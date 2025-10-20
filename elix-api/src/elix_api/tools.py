@@ -1,6 +1,5 @@
 import cv2
 
-
 def sample_first_frame(video_path: str) -> str:
     cap = cv2.VideoCapture(video_path)
     success, frame = cap.read()

@@ -7,7 +7,7 @@ def extract_text_from_chunk(transcript: pxt.type_system.Json)-> str:
     Extract text from a transcript JSON object.
     Note: Predictions of common S2T models are in dict format containing the text and chunk timestamps metadata. We need the text only.
     """
-    return f"{transcript['text']}"
+     return f"{transcript['text']}"
 
 
 @pxt.udf
