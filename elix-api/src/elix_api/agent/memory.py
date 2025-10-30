@@ -21,7 +21,8 @@ class Memory:
         self._memory_table = pxt.get_table(f"{self.directory}.memory")
     def _setup_table(self): 
         self._memory_table = pxt.create_table(
-        {
+            f"{self.directory}.memory",
+            schema={
                 "message_id": pxt.String,
                 "role": pxt.String,
                 "content": pxt.String, 

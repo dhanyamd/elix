@@ -4,7 +4,7 @@ import opik
 from loguru import logger
 from opik.configurator.configure import OpikConfigurator
 
-from kubrick_mcp.config import get_settings
+from elix_mcp.config import get_settings
 
 settings = get_settings()
 

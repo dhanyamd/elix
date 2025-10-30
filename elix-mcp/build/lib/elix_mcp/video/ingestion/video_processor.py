@@ -17,7 +17,7 @@ from elix_mcp.video.ingestion.functions import extract_text_from_chunk, resize_i
 from elix_mcp.video.ingestion.tools import re_encode_video
 
 if TYPE_CHECKING:
-    from kubrick_mcp.video.ingestion.models import CachedTable
+    from elix_mcp.video.ingestion.models import CachedTable
 
 logger = logger.bind(name="VideoProcessor")
 settings = get_settings()

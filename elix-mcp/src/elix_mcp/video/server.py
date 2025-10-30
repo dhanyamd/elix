@@ -72,7 +72,8 @@ def add_mcp_prompts(mcp: FastMCP):
  
 mcp = FastMCP("VideoProcessor")
 
-add_mcp_prompts(mcp)
+# TODO: Fix prompt addition when FastMCP API is updated
+# add_mcp_prompts(mcp)
 add_mcp_tools(mcp)
 add_mcp_resources(mcp) 
 

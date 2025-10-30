@@ -1,6 +1,6 @@
 from typing import Dict
-from kubrick_mcp.video.ingestion.models import CachedTable, CachedTableMetadata
-from kubrick_mcp.video.ingestion.registry import get_registry
+from elix_mcp.video.ingestion.models import CachedTable, CachedTableMetadata
+from elix_mcp.video.ingestion.registry import get_registry
 
 
 def list_tables() -> Dict[str, str]:

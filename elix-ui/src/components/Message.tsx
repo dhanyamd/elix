@@ -55,7 +55,7 @@ const Message = ({ content, isUser, timestamp, fileUrl, fileType, clipPath }: Me
         {clipPath && (
           <div className="mb-3">
             <video 
-              src={`http://localhost:8080/media/${clipPath.split('/').pop()}`}
+              src={`http://localhost:8000/media/${clipPath.split('/').pop()}`}
               controls 
               className="max-w-full h-auto rounded border border-gray-600"
               style={{ maxHeight: '300px' }}

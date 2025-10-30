@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from fastmcp import Client
 from loguru import logger 
 
-from elix_api.agent import Memory 
+from elix_api.agent.memory import Memory 
 
 class BaseAgent(ABC): 
     """

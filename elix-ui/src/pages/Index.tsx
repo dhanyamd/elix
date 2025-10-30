@@ -6,6 +6,8 @@ import TypingIndicator from '@/components/TypingIndicator';
 import VideoSidebar from '@/components/VideoSidebar';
 import { useEffect, useRef, useState } from 'react';
 
+const API_BASE_URL = 'http://localhost:8000';
+
 interface Message {
   id: string;
   content: string;
@@ -74,7 +76,7 @@ const Index = () => {
       uploadedVideos.forEach(async (video) => {
         if (video.taskId && video.processingStatus === 'in_progress') {
           try {
-            const response = await fetch(`http://localhost:8080/task-status/${video.taskId}`);
+            const response = await fetch(`${API_BASE_URL}/task-status/${video.taskId}`);
             if (response.ok) {
               const data = await response.json();
               if (data.status === 'completed' || data.status === 'failed') {
@@ -142,12 +144,13 @@ const Index = () => {
       }
       
 
-      const response = await fetch('http://localhost:8080/chat', {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        
       });
 
       if (!response.ok) {
@@ -231,7 +234,7 @@ const Index = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const uploadResponse = await fetch('http://localhost:8080/upload-video', {
+      const uploadResponse = await fetch(`${API_BASE_URL}/upload-video`, {
         method: 'POST',
         body: formData,
       });
@@ -245,7 +248,7 @@ const Index = () => {
       setUploadProgress(50);
       
       // Step 2: Start video processing
-      const processResponse = await fetch('http://localhost:8080/process-video', {
+      const processResponse = await fetch(`${API_BASE_URL}/process-video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

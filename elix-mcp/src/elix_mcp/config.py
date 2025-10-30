@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file="agent-api/.env", extra="ignore", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_file_encoding="utf-8")
 
     # --- GROQ Configuration ---
     GROQ_API_KEY: str 
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     OPIK_API_KEY: str | None = Field(default=None, description="API key for Comet ML and Opik services.")
     OPIK_WORKSPACE: str = "default"
     OPIK_PROJECT: str = Field(
-        default="kubrick-api",
+        default="elix-mcp",
         description="Project name for Comet ML and Opik tracking.",
     )
 
@@ -29,6 +29,20 @@ class Settings(BaseSettings):
 
     # --- Disable Nest Asyncio ---
     DISABLE_NEST_ASYNCIO: bool = True
+
+    # --- Video Processing Configuration ---
+    SPLIT_FRAMES_COUNT: int = 10
+    AUDIO_CHUNK_LENGTH: int = 10
+    AUDIO_OVERLAP_SECONDS: float = 2.0
+    AUDIO_MIN_CHUNK_DURATION_SECONDS: float = 1.0
+    AUDIO_TRANSCRIPT_MODEL: str = "whisper-1"
+    TRANSCRIPT_SIMILARITY_EMBD_MODEL: str = "text-embedding-3-small"
+    IMAGE_RESIZE_WIDTH: int = 224
+    IMAGE_RESIZE_HEIGHT: int = 224
+    IMAGE_SIMILARITY_EMBD_MODEL: str = "ViT-B/32"
+    CAPTION_MODEL_PROMPT: str = "Describe this image in detail."
+    IMAGE_CAPTION_MODEL: str = "blip2-image-captioning-large"
+    CAPTION_SIMILARITY_EMBD_MODEL: str = "text-embedding-3-small"
 
 
 @lru_cache(maxsize=1)
