@@ -142,7 +142,7 @@ const Index = () => {
       } else {
         console.log('🎬 No video path available for AI response');
       }
-      
+             
         
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
