@@ -6,40 +6,43 @@ from elix_mcp.video.resources import list_tables
 from elix_mcp.video.tools import (
     ask_question_about_video,
     get_video_clip_from_image,
-    get_video_clip_from_user_query,
+    get_video_clip_from_user_query,     
     process_video,
 )
 
 def add_mcp_tools(mcp: FastMCP): 
+    # NOTE: add_tool uses 'tool_id' (or the ID as the first positional argument), not 'name'.
+    # Removing 'name' is the fix for the TypeError.
     mcp.add_tool(
-        name="process_video",
+        "process_video", # Tool ID
         description="Process a video file and prepare it for searching. ",
         fn=process_video,
         tags={"video", "process"},
     )
 
     mcp.add_tool(
-        name="get_video_clip_from_user_query",
+        "get_video_clip_from_user_query", # Tool ID
         description="Use this tool to get a video clip from a video file based on a user query or question.",
         fn=get_video_clip_from_user_query,
         tags={"video", "clip", "query", "question"},
     )
 
     mcp.add_tool(
-        name="get_video_clip_from_image",
+        "get_video_clip_from_image", # Tool ID
         description="Use this tool to get a video clip from a video file based on a user image.",
         fn=get_video_clip_from_image,
         tags={"video", "clip", "image"},
     )
 
     mcp.add_tool(
-        name="ask_question_about_video",
+        "ask_question_about_video", # Tool ID
         description="Use this tool to get an answer to a question about the video.",
         fn=ask_question_about_video,
         tags={"ask", "question", "information"},
     )
 
 def add_mcp_resources(mcp: FastMCP):
+    # NOTE: add_resource_fn correctly uses 'name'.
     mcp.add_resource_fn(
         fn=list_tables,
         uri="file:///app/.records/records.json",
@@ -49,6 +52,7 @@ def add_mcp_resources(mcp: FastMCP):
     )
     
 def add_mcp_prompts(mcp: FastMCP):
+    # NOTE: add_prompt correctly uses 'name'.
     mcp.add_prompt(
         fn=routing_system_prompt,
         name="routing_system_prompt",
@@ -72,7 +76,8 @@ def add_mcp_prompts(mcp: FastMCP):
  
 mcp = FastMCP("VideoProcessor")
 
-# TODO: Fix prompt addition when FastMCP API is updated
+# Since the previous error didn't involve prompts, we'll assume the TODO line
+# is still valid and keep it commented out until you confirm the prompt API is stable.
 # add_mcp_prompts(mcp)
 add_mcp_tools(mcp)
 add_mcp_resources(mcp) 
