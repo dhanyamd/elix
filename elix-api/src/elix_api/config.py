@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     OPIK_API_KEY: str | None = Field(default=None, description="API key for Comet ML and Opik services.")
     OPIK_WORKSPACE: str = "default"
     OPIK_PROJECT: str = Field(
-        default="kelix-api",
+        default="elix-api",
         description="Project name for Comet ML and Opik tracking.",
     )
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     AGENT_MEMORY_SIZE: int = 20
 
     # --- MCP Configuration ---
-    MCP_SERVER: str = "http://elix-mcp:9090/mcp"
+    MCP_SERVER: str = "http://elix-mcp:9090/mcp/"
 
     # --- Disable Nest Asyncio ---
     DISABLE_NEST_ASYNCIO: bool = True

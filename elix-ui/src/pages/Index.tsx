@@ -76,19 +76,30 @@ const Index = () => {
       uploadedVideos.forEach(async (video) => {
         if (video.taskId && video.processingStatus === 'in_progress') {
           try {
+            console.log(`📊 Polling task status for ${video.taskId}...`);
             const response = await fetch(`${API_BASE_URL}/task-status/${video.taskId}`);
             if (response.ok) {
               const data = await response.json();
+              console.log(`📊 Task status for ${video.taskId}:`, data.status);
+              if (data.error) {
+                console.error(`❌ Task error for ${video.taskId}:`, data.error);
+              }
               if (data.status === 'completed' || data.status === 'failed') {
+                console.log(`📊 Updating video status to: ${data.status}`);
+                if (data.status === 'failed' && data.error) {
+                  console.error(`❌ Task failed with error:`, data.error);
+                }
                 setUploadedVideos(prev => prev.map(v => 
                   v.id === video.id 
                     ? { ...v, processingStatus: data.status }
                     : v
                 ));
               }
+            } else {
+              console.error(`❌ Failed to get task status: ${response.status} ${response.statusText}`);
             }
           } catch (error) {
-            console.error('Error polling task status:', error);
+            console.error('❌ Error polling task status:', error);
           }
         }
       });
@@ -231,6 +242,7 @@ const Index = () => {
     
     try {
       // Step 1: Upload video to API
+      console.log('📤 Step 1: Uploading video to API...');
       const formData = new FormData();
       formData.append('file', file);
       
@@ -239,15 +251,21 @@ const Index = () => {
         body: formData,
       });
       
+      console.log('📤 Upload response status:', uploadResponse.status, uploadResponse.statusText);
+      
       if (!uploadResponse.ok) {
-        throw new Error('Failed to upload video');
+        const errorText = await uploadResponse.text();
+        console.error('❌ Upload failed:', errorText);
+        throw new Error(`Failed to upload video: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
       }
       
       const uploadData = await uploadResponse.json();
+      console.log('✅ Upload successful:', uploadData);
       
       setUploadProgress(50);
       
       // Step 2: Start video processing
+      console.log('🛠️ Step 2: Starting video processing...');
       const processResponse = await fetch(`${API_BASE_URL}/process-video`, {
         method: 'POST',
         headers: {
@@ -258,11 +276,16 @@ const Index = () => {
         }),
       });
       
+      console.log('🛠️ Process response status:', processResponse.status, processResponse.statusText);
+      
       if (!processResponse.ok) {
-        throw new Error('Failed to start video processing');
+        const errorText = await processResponse.text();
+        console.error('❌ Process failed:', errorText);
+        throw new Error(`Failed to start video processing: ${processResponse.status} ${processResponse.statusText} - ${errorText}`);
       }
       
       const processData = await processResponse.json();
+      console.log('✅ Process started successfully:', processData);
       
       setUploadProgress(75);
       
@@ -285,6 +308,10 @@ const Index = () => {
       
     } catch (error) {
       console.error('🎬 Error in video upload/processing:', error);
+      if (error instanceof Error) {
+        console.error('🎬 Error message:', error.message);
+        console.error('🎬 Error stack:', error.stack);
+      }
       // Add error video to library with failed status
       const fileUrl = URL.createObjectURL(file);
       const errorVideo: UploadedVideo = {

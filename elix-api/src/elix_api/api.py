@@ -1,4 +1,4 @@
-import shutil
+import traceback
 from contextlib import asynccontextmanager
 from enum import Enum
 from pathlib import Path
@@ -30,17 +30,24 @@ class TaskStatus(str, Enum):
     IN_PROGRESS = "in_progress" 
     COMPLETED = "completed" 
     FAILED = "failed" 
-    NOT_FOUND = "not_found" 
+    NOT_FOUND = "not_found"
+
+# Store task errors for debugging
+task_errors: dict[str, str] = {} 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI): 
+    logger.info("🚀 Starting Elix API server...")
+    logger.info(f"🔗 MCP Server URL: {settings.MCP_SERVER}")
     app.state.agent = GroqAgent(
         name="elix",
         mcp_server=settings.MCP_SERVER,
         disable_tools=["process_video"], 
     )
     app.state.bg_task_states = dict()
+    logger.info("✅ Elix API server started successfully")
     yield
+    logger.info("🛑 Shutting down Elix API server...")
     app.state.agent.reset_memory()
 
 app = FastAPI(
@@ -68,40 +75,71 @@ async def root():
     """
     Root endpoint that redirects to API documentation
     """
+    logger.info("📥 Root endpoint accessed")
     return {"message": "Welcome to Elix API. Visit /docs for documentation"}
 
 @app.get("/task-status/{task_id}") 
 async def get_task_status(task_id: str, fastapi_request: Request): 
     status = fastapi_request.app.state.bg_task_states.get(task_id, TaskStatus.NOT_FOUND)
-    return {"task_id": task_id, "status": status} 
+    error = task_errors.get(task_id, None)
+    logger.info(f"📊 Task status check for {task_id}: {status}")
+    response = {"task_id": task_id, "status": status}
+    if error:
+        response["error"] = error
+    return response 
 
 @app.post("/process-video")
 async def process_video(request: ProcessVideoRequest, bg_tasks: BackgroundTasks, fastapi_request: Request):
     """
     Process a video and return the results
     """
+    logger.info(f"📥 Received process-video request for: {request.video_path}")
     task_id = str(uuid4())
     bg_task_states = fastapi_request.app.state.bg_task_states
+    logger.info(f"📝 Created task_id: {task_id}")
+    
+    # Initialize task status as PENDING before enqueuing
+    bg_task_states[task_id] = TaskStatus.PENDING
+    logger.info(f"📝 Task {task_id} initialized with status: PENDING")
 
     async def background_process_video(video_path: str, task_id: str): 
         """
         Background task to process the video
         """
-        bg_task_states[task_id] = TaskStatus.IN_PROGRESS 
+        logger.info(f"🚀 Starting background video processing task {task_id} for video: {video_path}")
+        bg_task_states[task_id] = TaskStatus.IN_PROGRESS
+        logger.info(f"📝 Task {task_id} status updated to: IN_PROGRESS") 
 
-        if not Path(video_path).exists():
-            bg_task_states[task_id] = TaskStatus.FAILED 
-            raise HTTPException(status=404, detail="Video file not found") 
-        try: 
+        try:
+            logger.info(f"📁 Checking if video file exists: {video_path}")
+            if not Path(video_path).exists():
+                error_msg = f"❌ Video file not found: {video_path}"
+                logger.error(error_msg)
+                bg_task_states[task_id] = TaskStatus.FAILED 
+                return
+            
+            logger.info(f"🔗 Connecting to MCP server: {settings.MCP_SERVER}")
             mcp_client = Client(settings.MCP_SERVER) 
+            
+            logger.info(f"🛠️ Calling process_video tool with video_path: {video_path}")
             async with mcp_client: 
-                _ = await mcp_client.call_tool("process_video", {"video_path": request.video_path})
+                logger.info(f"✅ MCP client connected, calling tool...")
+                result = await mcp_client.call_tool("process_video", {"video_path": video_path})
+                logger.info(f"✅ Video processing completed successfully. Result: {result}")
+            
+            bg_task_states[task_id] = TaskStatus.COMPLETED 
+            logger.info(f"✅ Task {task_id} completed successfully")
         except Exception as e: 
-            logger.error(f"Error processing video {video_path}: {e}") 
-            bg_task_states[task_id] = TaskStatus.FAILED 
-            raise HTTPException(status_code=500, detail=str(e)) 
-        bg_task_states[task_id] = TaskStatus.COMPLETED 
+            error_msg = f"❌ Error processing video {video_path}: {type(e).__name__}: {str(e)}"
+            full_error = f"{error_msg}\n\nFull traceback:\n{traceback.format_exc()}"
+            logger.error(error_msg, exc_info=True)
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            bg_task_states[task_id] = TaskStatus.FAILED
+            task_errors[task_id] = full_error  # Store error for debugging
+            logger.error(f"❌ Task {task_id} failed: {error_msg}") 
+    logger.info(f"📋 Enqueuing background task {task_id} for video: {request.video_path}")
     bg_tasks.add_task(background_process_video, request.video_path, task_id) 
+    logger.info(f"✅ Background task {task_id} enqueued successfully")
     return ProcessVideoResponse(message="Task enqueued for processing", task_id=task_id)
 
 @app.post("/chat", response_model=AssistantMessageResponse)
@@ -138,6 +176,7 @@ async def upload_video(file: UploadFile = File(...)):
     """
     Upload a video and return the path
     """
+    logger.info(f"📤 Received upload-video request for file: {file.filename}")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
@@ -145,10 +184,19 @@ async def upload_video(file: UploadFile = File(...)):
         shared_media_dir = Path("shared_media")
         shared_media_dir.mkdir(exist_ok=True)
 
-        video_path = Path(shared_media_dir / file.filename)
+        # Sanitize filename to prevent path traversal
+        safe_filename = Path(file.filename).name
+        video_path = shared_media_dir / safe_filename
+        
+        # Stream file content to disk to handle large files efficiently
         if not video_path.exists():
+            # Read and write in chunks to avoid loading entire file into memory
             with open(video_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
+                while chunk := await file.read(8192):  # Read in 8KB chunks
+                    f.write(chunk)
+            logger.info(f"Video uploaded successfully: {video_path}")
+        else:
+            logger.info(f"File {video_path} already exists, skipping upload")
 
         return VideoUploadResponse(message="Video uploaded successfully", video_path=str(video_path))
     except Exception as e:
@@ -180,7 +228,14 @@ async def serve_media(file_path: str):
 def run_api(port, host):
     import uvicorn
 
-    uvicorn.run("api:app", host=host, port=port, loop="asyncio")
+    uvicorn.run(
+        "api:app",
+        host=host,
+        port=port,
+        loop="asyncio",
+        timeout_keep_alive=120,  # Increase keep-alive timeout for large uploads
+        limit_concurrency=100,  # Allow more concurrent connections
+    )
 
 
 if __name__ == "__main__":

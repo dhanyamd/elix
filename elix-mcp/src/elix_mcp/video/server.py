@@ -1,5 +1,5 @@
 import click 
-from fastmcp import FastMCP 
+from fastmcp import FastMCP
 
 from elix_mcp.video.prompts import general_system_prompt, routing_system_prompt, tool_use_system_prompt
 from elix_mcp.video.resources import list_tables
@@ -11,38 +11,20 @@ from elix_mcp.video.tools import (
 )
 
 def add_mcp_tools(mcp: FastMCP): 
-    # NOTE: add_tool uses 'tool_id' (or the ID as the first positional argument), not 'name'.
-    # Removing 'name' is the fix for the TypeError.
-    mcp.add_tool(
-        "process_video", # Tool ID
-        description="Process a video file and prepare it for searching. ",
-        fn=process_video,
-        tags={"video", "process"},
-    )
+    # FastMCP.add_tool() only accepts a Tool instance, not a name and function.
+    # Use mcp.tool() to register functions - it converts them to Tool instances automatically.
+    # The tool name will be inferred from the function name, or you can specify it with name="...".
+    
+    mcp.tool(process_video)
 
-    mcp.add_tool(
-        "get_video_clip_from_user_query", # Tool ID
-        description="Use this tool to get a video clip from a video file based on a user query or question.",
-        fn=get_video_clip_from_user_query,
-        tags={"video", "clip", "query", "question"},
-    )
+    mcp.tool(get_video_clip_from_user_query)
 
-    mcp.add_tool(
-        "get_video_clip_from_image", # Tool ID
-        description="Use this tool to get a video clip from a video file based on a user image.",
-        fn=get_video_clip_from_image,
-        tags={"video", "clip", "image"},
-    )
+    mcp.tool(get_video_clip_from_image)
 
-    mcp.add_tool(
-        "ask_question_about_video", # Tool ID
-        description="Use this tool to get an answer to a question about the video.",
-        fn=ask_question_about_video,
-        tags={"ask", "question", "information"},
-    )
+    mcp.tool(ask_question_about_video)
 
 def add_mcp_resources(mcp: FastMCP):
-    # NOTE: add_resource_fn correctly uses 'name'.
+    # NOTE: add_resource_fn still uses keyword arguments.
     mcp.add_resource_fn(
         fn=list_tables,
         uri="file:///app/.records/records.json",
@@ -52,7 +34,7 @@ def add_mcp_resources(mcp: FastMCP):
     )
     
 def add_mcp_prompts(mcp: FastMCP):
-    # NOTE: add_prompt correctly uses 'name'.
+    # NOTE: add_prompt still uses keyword arguments.
     mcp.add_prompt(
         fn=routing_system_prompt,
         name="routing_system_prompt",
@@ -90,6 +72,8 @@ def run_mcp(port, host, transport):
     """
     Run the FastMCP server with the specified port, host, and transport protocol.
     """
+    # Use FastMCP's built-in run method which properly initializes everything
+    # This ensures all MCP protocol handlers are set up correctly
     mcp.run(host=host, port=port, transport=transport)
 
 
