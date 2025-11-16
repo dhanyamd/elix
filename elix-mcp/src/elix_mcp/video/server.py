@@ -60,7 +60,7 @@ mcp = FastMCP("VideoProcessor")
 
 # Since the previous error didn't involve prompts, we'll assume the TODO line
 # is still valid and keep it commented out until you confirm the prompt API is stable.
-# add_mcp_prompts(mcp)
+add_mcp_prompts(mcp)
 add_mcp_tools(mcp)
 add_mcp_resources(mcp) 
 

@@ -198,7 +198,14 @@ class VideoProcessor:
             raise ValueError("Video table is not initialized. Call setup_table() first.")
         logger.info(f"Adding video {video_path} to table {self.video_table_name}")
 
-        new_video_path = re_encode_video(video_path=video_path)
-        if new_video_path:
-            self.video_table.insert([{"video": video_path}])
-        return True
+        try:
+            new_video_path = re_encode_video(video_path=video_path)
+            # Use the re-encoded path if available, otherwise use original
+            video_to_insert = new_video_path if new_video_path else video_path
+            logger.info(f"Inserting video into table: {video_to_insert}")
+            self.video_table.insert([{"video": video_to_insert}])
+            logger.info(f"Successfully added video to table")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding video {video_path} to table: {e}", exc_info=True)
+            raise ValueError(f"Failed to add video to table: {str(e)}")

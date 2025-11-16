@@ -6,7 +6,7 @@ import TypingIndicator from '@/components/TypingIndicator';
 import VideoSidebar from '@/components/VideoSidebar';
 import { useEffect, useRef, useState } from 'react';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 interface Message {
   id: string;
@@ -159,6 +159,8 @@ const Index = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+          
         },
         body: JSON.stringify(requestBody),
         
@@ -270,6 +272,7 @@ const Index = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
         },
         body: JSON.stringify({
           video_path: uploadData.video_path

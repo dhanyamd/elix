@@ -25,8 +25,7 @@ class Settings(BaseSettings):
     AGENT_MEMORY_SIZE: int = 20
 
     # --- MCP Configuration ---
-    MCP_SERVER: str = "http://elix-mcp:9090/mcp"
-
+    MCP_SERVER: str = "http://elix-mcp:9090/mcp/"
     # --- Disable Nest Asyncio ---
     DISABLE_NEST_ASYNCIO: bool = True
 
@@ -39,10 +38,16 @@ class Settings(BaseSettings):
     TRANSCRIPT_SIMILARITY_EMBD_MODEL: str = "text-embedding-3-small"
     IMAGE_RESIZE_WIDTH: int = 224
     IMAGE_RESIZE_HEIGHT: int = 224
-    IMAGE_SIMILARITY_EMBD_MODEL: str = "ViT-B/32"
+    IMAGE_SIMILARITY_EMBD_MODEL: str = "openai/clip-vit-base-patch32"
     CAPTION_MODEL_PROMPT: str = "Describe this image in detail."
     IMAGE_CAPTION_MODEL: str = "blip2-image-captioning-large"
     CAPTION_SIMILARITY_EMBD_MODEL: str = "text-embedding-3-small"
+    
+    # --- Video Search Configuration ---
+    VIDEO_CLIP_SPEECH_SEARCH_TOP_K: int = 5
+    VIDEO_CLIP_CAPTION_SEARCH_TOP_K: int = 5
+    VIDEO_CLIP_IMAGE_SEARCH_TOP_K: int = 5
+    QUESTION_ANSWER_TOP_K: int = 5
 
 
 @lru_cache(maxsize=1)

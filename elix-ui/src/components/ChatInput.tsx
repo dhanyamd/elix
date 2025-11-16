@@ -65,7 +65,7 @@ const ChatInput = ({
   };
 
   return (
-    <div className="border-t border-red-900 bg-black p-4">
+    <div className="border-t border-pink-900 bg-black p-4">
       {/* File Preview - Only for images */}
       {attachedFile && (
         <div className="max-w-4xl mx-auto mb-3">
@@ -82,7 +82,7 @@ const ChatInput = ({
               <Button
                 onClick={removeAttachedFile}
                 size="icon"
-                className="w-6 h-6 bg-red-600 hover:bg-red-700 text-white"
+                  className="w-6 h-6 bg-pink-600 hover:bg-pink-700 text-white"
               >
                 <X className="w-3 h-3" />
               </Button>
@@ -104,13 +104,13 @@ const ChatInput = ({
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Enter your message, Dave..."
-          className="flex-1 bg-gray-900 border-gray-700 text-white placeholder-gray-500 font-mono focus:border-red-500 focus:ring-red-500"
+          className="flex-1 bg-gray-900 border-gray-700 text-white placeholder-gray-500 font-mono focus:border-pink-500 focus:ring-pink-500"
           disabled={isTyping}
         />
         <Button
           onClick={onSendMessage}
           disabled={(!inputMessage.trim() && !attachedFile) || isTyping}
-          className="bg-red-600 hover:bg-red-700 text-white border-0 transition-colors"
+          className="bg-pink-600 hover:bg-pink-700 text-white border-0 transition-colors"
         >
           <Send className="w-4 h-4" />
         </Button>

@@ -13,7 +13,8 @@ class MemoryRecord(BaseModel):
  
 class Memory: 
     def __init__(self, name: str): 
-        self.directory = name
+        # Sanitize name for pixeltable path (replace hyphens and other invalid chars with underscores)
+        self.directory = name.replace("-", "_").replace(".", "_")
         
         pxt.create_dir(self.directory, if_exists="replace_force") 
 

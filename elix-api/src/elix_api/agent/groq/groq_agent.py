@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime 
 from typing import Any, Dict, List, Optional
 
-from numpy import record 
 import instructor 
 from openai.resources.responses.responses import ResponsesWithRawResponse
 import opik
@@ -44,7 +43,8 @@ class GroqAgent(BaseAgent):
     image_base64: Optional[str]=None, n: int = settings.AGENT_MEMORY_SIZE
     ) -> List[Dict[str, Any]]:
        history = [{"role": "system", "content": system_prompt}] 
-       history += [{"role": record.role, "content": record.content}] 
+       memory_records = self.memory.get_latest(n)
+       history += [{"role": record.role, "content": record.content} for record in memory_records]
        user_content = (
         [
             {"type": "text", "text": user_message},
@@ -62,7 +62,7 @@ class GroqAgent(BaseAgent):
     @opik.track(name="router", type="llm")
     def _should_use_tool(self, message: str) -> bool: 
         messages = [
-            {"role": "system", "content": self.self.routing_system_prompt},
+            {"role": "system", "content": self.routing_system_prompt},
             {"role": "user", "content": message}
         ]
         response = self.instructor_client.chat.completions.create(
@@ -86,12 +86,12 @@ class GroqAgent(BaseAgent):
         function_args["video_path"] = video_path 
         if function_name == "get_video_clip_from_image": 
             function_args["user_image"] = image_base64 
-        logger.info(f"Executing tool:L {function_name}") 
+        logger.info(f"Executing tool: {function_name} with args: {function_args}") 
         try: 
             return await self.call_tool(function_name, function_args) 
         except Exception as e: 
-            logger.error(f"error executing tool call") 
-            return f" error executing tool {function_name, function_args}" 
+            logger.error(f"Error executing tool {function_name}: {e}", exc_info=True) 
+            return f" error executing tool {function_name, function_args}: {str(e)}" 
 
     @opik.track(name="tool-use", type="tool")
     async def _run_with_tool(self, message: str, video_path: str, image_base64: str | None = None) -> str:
@@ -99,7 +99,7 @@ class GroqAgent(BaseAgent):
         tool_use_system_prompt = self.tool_use_system_prompt.format(
             is_image_provided=bool(image_base64),
         )
-        chat_history = self._build_chat_history(tool_use_system_prompt, message)
+        chat_history = self._build_chat_history(tool_use_system_prompt, message, image_base64)
         response = (
             self.client.chat.completions.create(
                 model=settings.GROQ_TOOL_USE_MODEL,
@@ -118,9 +118,34 @@ class GroqAgent(BaseAgent):
             logger.info("No tool calls available, returning general response ...")
             return GeneralResponseModel(message=response.content)
 
+        actual_clip_path = None
         for tool_call in tool_calls:
             function_response = await self._execute_tool_call(tool_call, video_path, image_base64)
             logger.info(f"Function response: {function_response}")
+            
+            # Check if the tool execution failed (error messages start with " error" or contain error indicators)
+            if function_response.startswith(" error") or "error" in function_response.lower()[:50]:
+                logger.error(f"Tool execution failed: {function_response}")
+                # Extract a cleaner error message for the user
+                error_msg = function_response
+                if ":" in function_response:
+                    # Try to extract just the meaningful error part
+                    error_parts = function_response.split(":", 1)
+                    if len(error_parts) > 1:
+                        error_msg = error_parts[-1].strip()
+                
+                # If tool failed, return a general response instead of trying to create a video clip
+                user_friendly_message = f"I apologize, but I encountered an error while trying to process your request."
+                if "Video index not found" in function_response or "not found" in function_response.lower():
+                    user_friendly_message = "The video needs to be processed first before I can search it. Please wait for video processing to complete and try again."
+                elif "No matching clips found" in function_response:
+                    user_friendly_message = "I couldn't find any matching content in the video for your query. Please try rephrasing your question."
+                
+                return GeneralResponseModel(message=user_friendly_message)
+            
+            # Store the actual clip path before wrapping it for chat history
+            if tool_call.function.name in ["get_video_clip_from_image", "get_video_clip_from_user_query"]:
+                actual_clip_path = function_response
             
             if tool_call.function.name == "get_video_clip_from_image":
                 tool_response = f"This is the video context. Use it to answer the user's question: {function_response}"
@@ -150,7 +175,9 @@ class GroqAgent(BaseAgent):
         if isinstance(followup_response, VideoClipResponseModel):
             try:
                 logger.info("Validating VideoClip response")
-                self.validate_video_clip_response(followup_response, tool_response)
+                # Use the actual clip path (filename) instead of the wrapped tool_response
+                clip_path_to_use = actual_clip_path if actual_clip_path else followup_response.clip_path
+                self.validate_video_clip_response(followup_response, clip_path_to_use)
                 
                 logger.info(f"Tracing image from trimmed clip: {followup_response.clip_path}")
                 first_image_path = tools.sample_first_frame(followup_response.clip_path)
@@ -195,12 +222,27 @@ class GroqAgent(BaseAgent):
     @opik.track(name="chat", type="general")
     async def chat(self, message: str, video_path: Optional[str]=None, image_base64: Optional[str]=None) -> AssistantMessageResponse: 
         """Main entry point for accessing a user message"""
-        opik_context.update_current_trace(thread_id=self.thread_id) 
-        tool_required = video_path and self._should_use_tool(message) 
-        logger.info(f"Tool required: {tool_required}") 
+        try:
+            opik_context.update_current_trace(thread_id=self.thread_id) 
+            tool_required = video_path and self._should_use_tool(message) 
+            logger.info(f"Tool required: {tool_required}") 
 
-        if tool_required: 
-            logger.info("running tool response") 
-            response = await self._run_with_tool(message, video_path, image_base64) 
-        self._add_memory_pair(message, response.message) 
-        return AssistantMessageResponse(**response.dict())
+            if tool_required: 
+                logger.info("running tool response") 
+                try:
+                    response = await self._run_with_tool(message, video_path, image_base64) 
+                except Exception as e:
+                    logger.error(f"Error in _run_with_tool: {e}", exc_info=True)
+                    # Fall back to general response if tool execution fails
+                    response = self._respond_general(message)
+            else:
+                logger.info("running general response")
+                response = self._respond_general(message)
+            
+            self._add_memory_pair(message, response.message) 
+            return AssistantMessageResponse(**response.model_dump())
+        except Exception as e:
+            logger.error(f"Error in chat method: {e}", exc_info=True)
+            # Return a safe error response
+            error_message = "I apologize, but I'm experiencing technical difficulties. Please try again."
+            return AssistantMessageResponse(message=error_message, clip_path=None)

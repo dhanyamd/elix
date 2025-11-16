@@ -1,4 +1,4 @@
-import traceback
+import shutil
 from contextlib import asynccontextmanager
 from enum import Enum
 from pathlib import Path
@@ -14,41 +14,31 @@ from loguru import logger
 
 from elix_api.agent import GroqAgent
 from elix_api.config import get_settings
-from elix_api.models import (
-    AssistantMessageResponse,
-    ProcessVideoRequest,
-    ProcessVideoResponse,
-    ResetMemoryResponse,
-    UserMessageRequest,
-    VideoUploadResponse,
-)
+from elix_api.mcp_utils import retry_mcp_connection
+from elix_api.models import AssistantMessageResponse, ProcessVideoRequest, ProcessVideoResponse, ResetMemoryResponse, UserMessageRequest, VideoUploadResponse
 
 settings = get_settings()
 
-class TaskStatus(str, Enum): 
-    PENDING = "pending" 
-    IN_PROGRESS = "in_progress" 
-    COMPLETED = "completed" 
-    FAILED = "failed" 
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
     NOT_FOUND = "not_found"
 
-# Store task errors for debugging
-task_errors: dict[str, str] = {} 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI): 
-    logger.info("🚀 Starting Elix API server...")
-    logger.info(f"🔗 MCP Server URL: {settings.MCP_SERVER}")
+async def lifespan(app: FastAPI):
     app.state.agent = GroqAgent(
-        name="elix",
+        name="elix-api",
         mcp_server=settings.MCP_SERVER,
-        disable_tools=["process_video"], 
+        disable_tools=["process_video"],
     )
     app.state.bg_task_states = dict()
-    logger.info("✅ Elix API server started successfully")
     yield
-    logger.info("🛑 Shutting down Elix API server...")
     app.state.agent.reset_memory()
+
 
 app = FastAPI(
     title="Elix API",
@@ -57,13 +47,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+ALLOWED_ORIGINS = [
+    "*", # Wildcard for simple requests (but better to be specific)
+    "http://localhost",
+    "http://localhost:3000", # Frontend port
+    "http://127.0.0.1:3000", # Fallback for frontend port
+    settings.FRONTEND_URL, # Assuming this is defined in your settings
+]
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Frontend URL
+    allow_origins=ALLOWED_ORIGINS, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+     
 )
 
 # Mount static files for media serving
@@ -75,76 +73,135 @@ async def root():
     """
     Root endpoint that redirects to API documentation
     """
-    logger.info("📥 Root endpoint accessed")
     return {"message": "Welcome to Elix API. Visit /docs for documentation"}
 
-@app.get("/task-status/{task_id}") 
-async def get_task_status(task_id: str, fastapi_request: Request): 
+
+@app.get("/task-status/{task_id}")
+async def get_task_status(task_id: str, fastapi_request: Request):
     status = fastapi_request.app.state.bg_task_states.get(task_id, TaskStatus.NOT_FOUND)
-    error = task_errors.get(task_id, None)
-    logger.info(f"📊 Task status check for {task_id}: {status}")
+    error = fastapi_request.app.state.bg_task_states.get(f"{task_id}_error")
     response = {"task_id": task_id, "status": status}
     if error:
         response["error"] = error
-    return response 
+    return response
+
 
 @app.post("/process-video")
 async def process_video(request: ProcessVideoRequest, bg_tasks: BackgroundTasks, fastapi_request: Request):
     """
     Process a video and return the results
     """
-    logger.info(f"📥 Received process-video request for: {request.video_path}")
     task_id = str(uuid4())
     bg_task_states = fastapi_request.app.state.bg_task_states
-    logger.info(f"📝 Created task_id: {task_id}")
-    
-    # Initialize task status as PENDING before enqueuing
-    bg_task_states[task_id] = TaskStatus.PENDING
-    logger.info(f"📝 Task {task_id} initialized with status: PENDING")
 
-    async def background_process_video(video_path: str, task_id: str): 
+    async def background_process_video(video_path: str, task_id: str):
         """
         Background task to process the video
         """
-        logger.info(f"🚀 Starting background video processing task {task_id} for video: {video_path}")
         bg_task_states[task_id] = TaskStatus.IN_PROGRESS
-        logger.info(f"📝 Task {task_id} status updated to: IN_PROGRESS") 
 
         try:
-            logger.info(f"📁 Checking if video file exists: {video_path}")
             if not Path(video_path).exists():
-                error_msg = f"❌ Video file not found: {video_path}"
+                error_msg = f"Video file not found at {video_path}"
                 logger.error(error_msg)
-                bg_task_states[task_id] = TaskStatus.FAILED 
+                bg_task_states[task_id] = TaskStatus.FAILED
+                bg_task_states[f"{task_id}_error"] = error_msg
                 return
+
+            logger.info(f"Starting video processing for {video_path}")
+            logger.info(f"Connecting to MCP server at: {settings.MCP_SERVER}")
             
-            logger.info(f"🔗 Connecting to MCP server: {settings.MCP_SERVER}")
-            mcp_client = Client(settings.MCP_SERVER) 
+            try:
+                mcp_client = Client(settings.MCP_SERVER)
+                
+                async def _process_video():
+                    async with mcp_client:
+                        result = await mcp_client.call_tool("process_video", {"video_path": video_path})
+                        return result
+                
+                result = await retry_mcp_connection(_process_video, mcp_server_url=settings.MCP_SERVER)
+                logger.info(f"Video processing result: {result}")
+            except Exception as mcp_error:
+                # Provide more helpful error message for connection issues
+                error_str = str(mcp_error)
+                error_lower = error_str.lower()
+                
+                # Check for various connection error patterns
+                is_connection_error = (
+                    "name or service not known" in error_lower
+                    or "failed to connect" in error_lower
+                    or "connection" in error_lower and ("refused" in error_lower or "failed" in error_lower or "error" in error_lower)
+                    or "all connection attempts failed" in error_lower
+                    or isinstance(mcp_error, (ConnectionError, OSError))
+                )
+                
+                if is_connection_error:
+                    # Check if we're trying to use Docker hostname but might be running locally
+                    troubleshooting = ""
+                    if "elix-mcp" in settings.MCP_SERVER:
+                        troubleshooting = (
+                            f"\n\nTroubleshooting:\n"
+                            f"1. If running locally (outside Docker), set MCP_SERVER=http://localhost:9090/mcp/\n"
+                            f"2. If running in Docker, ensure elix-mcp container is running: docker ps | grep elix-mcp\n"
+                            f"3. Check MCP server is accessible: curl {settings.MCP_SERVER.replace('elix-mcp', 'localhost')}\n"
+                        )
+                    
+                    error_msg = (
+                        f"Failed to connect to MCP server at {settings.MCP_SERVER}. "
+                        f"Please ensure the MCP server is running and accessible.{troubleshooting}"
+                        f"\nOriginal error: {error_str}"
+                    )
+                    logger.error(error_msg)
+                    bg_task_states[task_id] = TaskStatus.FAILED
+                    bg_task_states[f"{task_id}_error"] = error_msg
+                    return
+                raise
             
-            logger.info(f"🛠️ Calling process_video tool with video_path: {video_path}")
-            async with mcp_client: 
-                logger.info(f"✅ MCP client connected, calling tool...")
-                result = await mcp_client.call_tool("process_video", {"video_path": video_path})
-                logger.info(f"✅ Video processing completed successfully. Result: {result}")
+            bg_task_states[task_id] = TaskStatus.COMPLETED
+            logger.info(f"Video processing completed successfully for {video_path}")
+        except Exception as e:
+            error_str = str(e)
+            error_lower = error_str.lower()
             
-            bg_task_states[task_id] = TaskStatus.COMPLETED 
-            logger.info(f"✅ Task {task_id} completed successfully")
-        except Exception as e: 
-            error_msg = f"❌ Error processing video {video_path}: {type(e).__name__}: {str(e)}"
-            full_error = f"{error_msg}\n\nFull traceback:\n{traceback.format_exc()}"
+            # Check if this is a connection error that wasn't caught earlier
+            is_connection_error = (
+                "name or service not known" in error_lower
+                or "failed to connect" in error_lower
+                or "all connection attempts failed" in error_lower
+                or ("connection" in error_lower and ("refused" in error_lower or "failed" in error_lower or "error" in error_lower))
+                or isinstance(e, (ConnectionError, OSError))
+            )
+            
+            if is_connection_error:
+                # Provide troubleshooting help for connection errors
+                troubleshooting = ""
+                if "elix-mcp" in settings.MCP_SERVER:
+                    troubleshooting = (
+                        f"\n\nTroubleshooting:\n"
+                        f"1. If running locally (outside Docker), set MCP_SERVER=http://localhost:9090/mcp/\n"
+                        f"2. If running in Docker, ensure elix-mcp container is running: docker ps | grep elix-mcp\n"
+                        f"3. Check MCP server is accessible: curl {settings.MCP_SERVER.replace('elix-mcp', 'localhost')}\n"
+                    )
+                
+                error_msg = (
+                    f"Error processing video {video_path}: Failed to connect to MCP server at {settings.MCP_SERVER}. "
+                    f"Please ensure the MCP server is running and accessible.{troubleshooting}"
+                    f"\nOriginal error: {error_str}"
+                )
+            else:
+                error_msg = f"Error processing video {video_path}: {error_str}"
+            
             logger.error(error_msg, exc_info=True)
-            logger.error(f"Full traceback: {traceback.format_exc()}")
             bg_task_states[task_id] = TaskStatus.FAILED
-            task_errors[task_id] = full_error  # Store error for debugging
-            logger.error(f"❌ Task {task_id} failed: {error_msg}") 
-    logger.info(f"📋 Enqueuing background task {task_id} for video: {request.video_path}")
-    bg_tasks.add_task(background_process_video, request.video_path, task_id) 
-    logger.info(f"✅ Background task {task_id} enqueued successfully")
+            bg_task_states[f"{task_id}_error"] = error_msg
+
+    bg_tasks.add_task(background_process_video, request.video_path, task_id)
     return ProcessVideoResponse(message="Task enqueued for processing", task_id=task_id)
+
 
 @app.post("/chat", response_model=AssistantMessageResponse)
 async def chat(request: UserMessageRequest, fastapi_request: Request):
-     """
+    """
     Chat with the AI assistant
 
     Args:
@@ -153,14 +210,16 @@ async def chat(request: UserMessageRequest, fastapi_request: Request):
     Returns:
         ChatResponse containing the assistant's response
     """
-     agent = fastapi_request.app.state.agent
-     await agent.setup()
+    agent = fastapi_request.app.state.agent
+    await agent.setup()
 
-     try:
+    try:
         response = await agent.chat(request.message, request.video_path, request.image_base64)
         return response
-     except Exception as e:
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/reset-memory")
 async def reset_memory(fastapi_request: Request):
@@ -171,12 +230,12 @@ async def reset_memory(fastapi_request: Request):
     agent.reset_memory()
     return ResetMemoryResponse(message="Memory reset successfully")
 
+
 @app.post("/upload-video", response_model=VideoUploadResponse)
 async def upload_video(file: UploadFile = File(...)):
     """
     Upload a video and return the path
     """
-    logger.info(f"📤 Received upload-video request for file: {file.filename}")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
@@ -184,19 +243,10 @@ async def upload_video(file: UploadFile = File(...)):
         shared_media_dir = Path("shared_media")
         shared_media_dir.mkdir(exist_ok=True)
 
-        # Sanitize filename to prevent path traversal
-        safe_filename = Path(file.filename).name
-        video_path = shared_media_dir / safe_filename
-        
-        # Stream file content to disk to handle large files efficiently
+        video_path = Path(shared_media_dir / file.filename)
         if not video_path.exists():
-            # Read and write in chunks to avoid loading entire file into memory
             with open(video_path, "wb") as f:
-                while chunk := await file.read(8192):  # Read in 8KB chunks
-                    f.write(chunk)
-            logger.info(f"Video uploaded successfully: {video_path}")
-        else:
-            logger.info(f"File {video_path} already exists, skipping upload")
+                shutil.copyfileobj(file.file, f)
 
         return VideoUploadResponse(message="Video uploaded successfully", video_path=str(video_path))
     except Exception as e:
@@ -228,14 +278,7 @@ async def serve_media(file_path: str):
 def run_api(port, host):
     import uvicorn
 
-    uvicorn.run(
-        "api:app",
-        host=host,
-        port=port,
-        loop="asyncio",
-        timeout_keep_alive=120,  # Increase keep-alive timeout for large uploads
-        limit_concurrency=100,  # Allow more concurrent connections
-    )
+    uvicorn.run("elix_api.api:app", host=host, port=port, loop="asyncio")
 
 
 if __name__ == "__main__":

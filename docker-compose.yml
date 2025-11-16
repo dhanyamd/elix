@@ -1,0 +1,76 @@
+services:
+  elix-mcp:
+    container_name: elix-mcp
+    build:
+      context: ./elix-mcp
+    ports:
+      - "9090:9090"
+    env_file:
+      - ./elix-mcp/.env
+    command: /app/.venv/bin/python src/elix_mcp/video/server.py --port 9090 --host 0.0.0.0 --transport streamable-http
+    networks:
+      - agent-network
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - ./.vscode:/app/.vscode
+      - shared_media:/app/shared_media
+      - ~/.cache:/root/.cache
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.settimeout(1); result = s.connect_ex(('localhost', 9090)); s.close(); exit(0 if result == 0 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '4' 
+          memory: 4G   
+        reservations:
+          cpus: '4'    
+          memory: 4G   
+
+  elix-api:
+    container_name: elix-api
+    build:
+      context: ./elix-api
+    command: /app/.venv/bin/python src/elix_api/api.py --port 8080 --host 0.0.0.0
+    ports:
+      - "8080:8080"
+    environment:
+      - DISABLE_NEST_ASYNCIO=True
+      - MCP_SERVER=http://elix-mcp:9090/mcp/
+    env_file:
+      - ./elix-api/.env
+    networks:
+      - agent-network
+    depends_on:
+      elix-mcp:
+        condition: service_healthy
+    volumes:
+      - shared_media:/app/shared_media
+      - ./.vscode:/app/.vscode
+  elix-ui:
+    container_name: elix-ui
+    build:
+      context: ./elix-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - elix-api
+      - elix-mcp
+    networks:
+      - agent-network
+    volumes:
+      - shared_media:/app/shared_media
+
+networks:
+  agent-network:
+    name: agent-network
+
+volumes:
+  shared_media:
+    name: shared_media

@@ -15,16 +15,16 @@ const Message = ({ content, isUser, timestamp, fileUrl, fileType, clipPath }: Me
         className={`w-[700px] flex-shrink-0 p-4 rounded-lg ${
           isUser
             ? 'bg-gray-800 border border-gray-700 text-white'
-            : 'bg-red-950 border border-red-800 text-red-100'
+            : 'bg-pink-950 border border-pink-800 text-pink-100'
         }`}
       >
-        <div className={`flex items-center gap-2 text-xs mb-2 ${isUser ? 'text-gray-400' : 'text-red-400'}`}>
+        <div className={`flex items-center gap-2 text-xs mb-2 ${isUser ? 'text-gray-400' : 'text-pink-400'}`}>
           {!isUser && (
             <div className="flex items-center gap-2">
               {/* HAL 9000 Eye Logo */}
               <div className="relative">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"></div>
-                <div className="absolute inset-0 w-3 h-3 bg-red-400 rounded-full animate-ping opacity-75"></div>
+                <div className="w-3 h-3 bg-pink-500 rounded-full animate-pulse shadow-lg shadow-pink-500/50"></div>
+                <div className="absolute inset-0 w-3 h-3 bg-pink-400 rounded-full animate-ping opacity-75"></div>
               </div>
               <span>HAL 9000</span>
             </div>
@@ -55,7 +55,7 @@ const Message = ({ content, isUser, timestamp, fileUrl, fileType, clipPath }: Me
         {clipPath && (
           <div className="mb-3">
             <video 
-              src={`http://localhost:8000/media/${clipPath.split('/').pop()}`}
+              src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/media/${clipPath.split('/').pop()}`}
               controls 
               className="max-w-full h-auto rounded border border-gray-600"
               style={{ maxHeight: '300px' }}
